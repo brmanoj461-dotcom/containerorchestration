@@ -1,0 +1,29 @@
+FROM python:3.13-slim
+
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    python3-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+RUN mkdir -p /app/data /app/logs /nginx-config && \
+    chmod 755 /app/logs /app/data
+
+ENV PYTHONPATH=/app
+ENV ORCHESTRY_DB_PATH=/app/data/autoscaler.db
+ENV ORCHESTRY_NGINX_CONTAINER=orchestry-nginx
+
+EXPOSE 8000 8001 8002 8003
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${ORCHESTRY_PORT:-8000}/health || exit 1
+
+CMD ["python", "controller/main.py"]

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: App
+metadata:
+  name: my-manual-server
+  labels:
+    app: "my-manual-server"
+    version: "v1"
+spec:
+  type: http
+  image: "testing:latest"
+  ports:
+    - containerPort: 9010
+      protocol: HTTP
+  resources:
+    cpu: "100m"
+    memory: "128Mi"
+scaling:
+  mode: manual
+  minReplicas: 1
+  maxReplicas: 10
+healthCheck:
+  path: "/health"
+  periodSeconds: 10

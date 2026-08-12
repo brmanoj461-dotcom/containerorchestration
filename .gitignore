@@ -1,0 +1,16 @@
+.venv
+*egg.info/
+dist/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.env.docker
+data/
+configs/nginx/
+hello.md
+logs/
+Env/
+manual.md
+orchestry.egg-info
+todo.md

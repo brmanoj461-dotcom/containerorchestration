@@ -1,0 +1,254 @@
+services:
+  postgres-primary:
+    image: postgres:15-alpine
+    container_name: orchestry-postgres-primary
+    environment:
+      POSTGRES_DB: orchestry
+      POSTGRES_USER: orchestry
+      POSTGRES_PASSWORD: orchestry_password
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+    volumes:
+      - postgres_primary_data:/var/lib/postgresql/data
+      - postgres_archive:/var/lib/postgresql/archive
+      - ./configs/postgres/postgresql-primary.conf:/etc/postgresql/postgresql.conf
+      - ./configs/postgres/pg_hba-primary.conf:/etc/postgresql/pg_hba.conf
+      - ./configs/postgres/postgres-init.sh:/docker-entrypoint-initdb.d/01-init.sh
+      - ./configs/postgres/setup-replication-slot.sh:/docker-entrypoint-initdb.d/02-replication-slot.sh
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c hba_file=/etc/postgresql/pg_hba.conf
+    ports:
+      - "5432:5432"
+    networks:
+      - orchestry
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orchestry -d orchestry"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "orchestry.service=postgres-primary"
+      - "orchestry.managed=true"
+
+  postgres-replica:
+    image: postgres:15-alpine
+    container_name: orchestry-postgres-replica
+    environment:
+      POSTGRES_DB: orchestry
+      POSTGRES_USER: orchestry
+      POSTGRES_PASSWORD: orchestry_password
+      PGUSER: postgres
+      PGPASSWORD: replication_password
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+      - ./configs/postgres/postgresql-replica.conf:/docker-entrypoint-initdb.d/postgresql-replica.conf
+      - ./configs/postgres/pg_hba-replica.conf:/docker-entrypoint-initdb.d/pg_hba-replica.conf
+      - ./configs/postgres/setup-replica.sh:/usr/local/bin/setup-replica.sh
+    entrypoint: ["/usr/local/bin/setup-replica.sh"]
+    ports:
+      - "5433:5432"
+    networks:
+      - orchestry
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orchestry -d orchestry"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "orchestry.service=postgres-replica"
+      - "orchestry.managed=true"
+
+  nginx:
+    image: nginx:alpine
+    container_name: orchestry-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./configs/nginx:/etc/nginx/conf.d
+      - ./configs/nginx-main.conf:/etc/nginx/nginx.conf
+    networks:
+      - orchestry
+    restart: unless-stopped
+    labels:
+      - "orchestry.service=nginx"
+      - "orchestry.managed=true"
+
+  # Controller Node 1 (Primary)
+  controller-1:
+    build:
+      context: .
+      dockerfile: configs/Dockerfile.controller
+    container_name: orchestry-controller-1
+    hostname: controller-1
+    ports:
+      - "${CONTROLLER_1_PORT}:${CONTROLLER_1_PORT}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./configs/nginx:/nginx-config
+      - ./logs:/app/logs
+    environment:
+      - POSTGRES_PRIMARY_HOST=postgres-primary
+      - POSTGRES_PRIMARY_PORT=5432
+      - POSTGRES_REPLICA_HOST=postgres-replica
+      - POSTGRES_REPLICA_PORT=5432
+      - POSTGRES_DB=orchestry
+      - POSTGRES_USER=orchestry
+      - POSTGRES_PASSWORD=orchestry_password
+      - POSTGRES_MIN_CONNECTIONS=5
+      - POSTGRES_MAX_CONNECTIONS=20
+      - ORCHESTRY_HOST=${ORCHESTRY_HOST}
+      - ORCHESTRY_PORT=${CONTROLLER_1_PORT}
+      - ORCHESTRY_NGINX_CONTAINER=${ORCHESTRY_NGINX_CONTAINER}
+      - CONTROLLER_LB_HOST=controller-lb
+      - CONTROLLER_LB_PORT=${CONTROLLER_LB_PORT}
+      - CLUSTER_NODE_ID=controller-1
+      - CLUSTER_HOSTNAME=controller-1
+    networks:
+      - orchestry
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      postgres-replica:
+        condition: service_healthy
+      nginx:
+        condition: service_started
+    restart: unless-stopped
+    labels:
+      - "orchestry.service=controller"
+      - "orchestry.node=controller-1"
+      - "orchestry.managed=true"
+
+  # Controller Node 2 (Secondary)
+  controller-2:
+    build:
+      context: .
+      dockerfile: configs/Dockerfile.controller
+    container_name: orchestry-controller-2
+    hostname: controller-2
+    ports:
+      - "${CONTROLLER_2_PORT}:${CONTROLLER_2_PORT}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./configs/nginx:/nginx-config
+      - ./logs:/app/logs
+    environment:
+      - POSTGRES_PRIMARY_HOST=postgres-primary
+      - POSTGRES_PRIMARY_PORT=5432
+      - POSTGRES_REPLICA_HOST=postgres-replica
+      - POSTGRES_REPLICA_PORT=5432
+      - POSTGRES_DB=orchestry
+      - POSTGRES_USER=orchestry
+      - POSTGRES_PASSWORD=orchestry_password
+      - POSTGRES_MIN_CONNECTIONS=5
+      - POSTGRES_MAX_CONNECTIONS=20
+      - ORCHESTRY_HOST=${ORCHESTRY_HOST}
+      - ORCHESTRY_PORT=${CONTROLLER_2_PORT}
+      - ORCHESTRY_NGINX_CONTAINER=${ORCHESTRY_NGINX_CONTAINER}
+      - CONTROLLER_LB_HOST=controller-lb
+      - CONTROLLER_LB_PORT=${CONTROLLER_LB_PORT}
+      - CLUSTER_NODE_ID=controller-2
+      - CLUSTER_HOSTNAME=controller-2
+    networks:
+      - orchestry
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      postgres-replica:
+        condition: service_healthy
+      nginx:
+        condition: service_started
+      controller-1:
+        condition: service_started
+    restart: unless-stopped
+    labels:
+      - "orchestry.service=controller"
+      - "orchestry.node=controller-2"
+      - "orchestry.managed=true"
+
+  # Controller Node 3 (Tertiary)
+  controller-3:
+    build:
+      context: .
+      dockerfile: configs/Dockerfile.controller
+    container_name: orchestry-controller-3
+    hostname: controller-3
+    ports:
+      - "${CONTROLLER_3_PORT}:${CONTROLLER_3_PORT}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./configs/nginx:/nginx-config
+      - ./logs:/app/logs
+    environment:
+      - POSTGRES_PRIMARY_HOST=postgres-primary
+      - POSTGRES_PRIMARY_PORT=5432
+      - POSTGRES_REPLICA_HOST=postgres-replica
+      - POSTGRES_REPLICA_PORT=5432
+      - POSTGRES_DB=orchestry
+      - POSTGRES_USER=orchestry
+      - POSTGRES_PASSWORD=orchestry_password
+      - POSTGRES_MIN_CONNECTIONS=5
+      - POSTGRES_MAX_CONNECTIONS=20
+      - ORCHESTRY_HOST=${ORCHESTRY_HOST}
+      - ORCHESTRY_PORT=${CONTROLLER_3_PORT}
+      - ORCHESTRY_NGINX_CONTAINER=${ORCHESTRY_NGINX_CONTAINER}
+      - CONTROLLER_LB_HOST=controller-lb
+      - CONTROLLER_LB_PORT=${CONTROLLER_LB_PORT}
+      - CLUSTER_NODE_ID=controller-3
+      - CLUSTER_HOSTNAME=controller-3
+    networks:
+      - orchestry
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      postgres-replica:
+        condition: service_healthy
+      nginx:
+        condition: service_started
+      controller-1:
+        condition: service_started
+      controller-2:
+        condition: service_started
+    restart: unless-stopped
+    labels:
+      - "orchestry.service=controller"
+      - "orchestry.node=controller-3"
+      - "orchestry.managed=true"
+
+  # Load Balancer for Controller API access
+  controller-lb:
+    image: nginx:alpine
+    container_name: orchestry-controller-lb
+    ports:
+      - "${CONTROLLER_LB_PORT}:80"
+    volumes:
+      - ./configs/controller-lb.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - orchestry
+    depends_on:
+      - controller-1
+      - controller-2
+      - controller-3
+    restart: unless-stopped
+    labels:
+      - "orchestry.service=controller-lb"
+      - "orchestry.managed=true"
+
+networks:
+  orchestry:
+    driver: bridge
+    name: orchestry
+
+volumes:
+  postgres_primary_data:
+    driver: local
+  postgres_replica_data:
+    driver: local
+  postgres_archive:
+    driver: local
+
+
+
