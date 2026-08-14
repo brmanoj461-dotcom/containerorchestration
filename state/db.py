@@ -70,7 +70,7 @@ class PostgreSQLManager:
                  replica_port: int = 5432,
                  database: str = "orchestry",
                  username: str = "orchestry",
-                 password: str = "orchestry_password",
+                 password: str = "CONTAINER_ORCH_password",
                  min_conn: int = 5,
                  max_conn: int = 20):
         
@@ -953,7 +953,7 @@ def get_database_manager(**kwargs) -> PostgreSQLManager:
         'replica_port': int(pg_kwargs.get('replica_port', os.getenv('POSTGRES_REPLICA_PORT', '5432'))),
         'database': pg_kwargs.get('database', os.getenv('POSTGRES_DB', 'orchestry')),
         'username': pg_kwargs.get('username', os.getenv('POSTGRES_USER', 'orchestry')),
-        'password': pg_kwargs.get('password', os.getenv('POSTGRES_PASSWORD', 'orchestry_password')),
+        'password': pg_kwargs.get('password', os.getenv('POSTGRES_PASSWORD', 'CONTAINER_ORCH_password')),
         'min_conn': pg_kwargs.get('min_conn', int(os.getenv('POSTGRES_MIN_CONNECTIONS', '5'))),
         'max_conn': pg_kwargs.get('max_conn', int(os.getenv('POSTGRES_MAX_CONNECTIONS', '20'))),
     }

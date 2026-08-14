@@ -523,13 +523,13 @@ class PrometheusExporterPlugin(MetricsExporter):
             
             # Create metric objects
             self.metrics = {
-                'app_replicas': Gauge('orchestry_app_replicas', 'Number of replicas', ['app_name'], registry=self.registry),
-                'app_healthy_instances': Gauge('orchestry_app_healthy_instances', 'Healthy instances', ['app_name'], registry=self.registry),
-                'app_cpu_percent': Gauge('orchestry_app_cpu_percent', 'CPU usage percentage', ['app_name'], registry=self.registry),
-                'app_memory_percent': Gauge('orchestry_app_memory_percent', 'Memory usage percentage', ['app_name'], registry=self.registry),
-                'app_rps': Gauge('orchestry_app_rps', 'Requests per second', ['app_name'], registry=self.registry),
-                'scaling_events': Counter('orchestry_scaling_events_total', 'Scaling events', ['app_name', 'direction'], registry=self.registry),
-                'health_check_failures': Counter('orchestry_health_check_failures_total', 'Health check failures', ['app_name'], registry=self.registry)
+                'app_replicas': Gauge('CONTAINER_ORCH_app_replicas', 'Number of replicas', ['app_name'], registry=self.registry),
+                'app_healthy_instances': Gauge('CONTAINER_ORCH_app_healthy_instances', 'Healthy instances', ['app_name'], registry=self.registry),
+                'app_cpu_percent': Gauge('CONTAINER_ORCH_app_cpu_percent', 'CPU usage percentage', ['app_name'], registry=self.registry),
+                'app_memory_percent': Gauge('CONTAINER_ORCH_app_memory_percent', 'Memory usage percentage', ['app_name'], registry=self.registry),
+                'app_rps': Gauge('CONTAINER_ORCH_app_rps', 'Requests per second', ['app_name'], registry=self.registry),
+                'scaling_events': Counter('CONTAINER_ORCH_scaling_events_total', 'Scaling events', ['app_name', 'direction'], registry=self.registry),
+                'health_check_failures': Counter('CONTAINER_ORCH_health_check_failures_total', 'Health check failures', ['app_name'], registry=self.registry)
             }
             
             return True

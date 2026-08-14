@@ -47,28 +47,28 @@ class MetricsExporter:
     def _setup_prometheus_metrics(self):
         """Initialize Prometheus metric objects."""
         # System metrics
-        self.app_count = Gauge('orchestry_apps_total', 'Total number of registered apps')
-        self.running_apps = Gauge('orchestry_apps_running', 'Number of running apps')
-        self.container_count = Gauge('orchestry_containers_total', 'Total number of containers', ['status'])
+        self.app_count = Gauge('CONTAINER_ORCH_apps_total', 'Total number of registered apps')
+        self.running_apps = Gauge('CONTAINER_ORCH_apps_running', 'Number of running apps')
+        self.container_count = Gauge('CONTAINER_ORCH_containers_total', 'Total number of containers', ['status'])
         
         # Application metrics
-        self.app_rps = Gauge('orchestry_app_rps', 'Requests per second', ['app'])
-        self.app_latency = Histogram('orchestry_app_latency_seconds', 'Response latency', ['app'])
-        self.app_replicas = Gauge('orchestry_app_replicas', 'Number of replicas', ['app', 'status'])
-        self.app_cpu = Gauge('orchestry_app_cpu_percent', 'CPU usage percentage', ['app'])
-        self.app_memory = Gauge('orchestry_app_memory_percent', 'Memory usage percentage', ['app'])
+        self.app_rps = Gauge('CONTAINER_ORCH_app_rps', 'Requests per second', ['app'])
+        self.app_latency = Histogram('CONTAINER_ORCH_app_latency_seconds', 'Response latency', ['app'])
+        self.app_replicas = Gauge('CONTAINER_ORCH_app_replicas', 'Number of replicas', ['app', 'status'])
+        self.app_cpu = Gauge('CONTAINER_ORCH_app_cpu_percent', 'CPU usage percentage', ['app'])
+        self.app_memory = Gauge('CONTAINER_ORCH_app_memory_percent', 'Memory usage percentage', ['app'])
         
         # Scaling metrics
-        self.scaling_events = Counter('orchestry_scaling_events_total', 'Number of scaling events', ['app', 'direction'])
-        self.scaling_decisions = Counter('orchestry_scaling_decisions_total', 'Number of scaling decisions', ['app', 'action'])
+        self.scaling_events = Counter('CONTAINER_ORCH_scaling_events_total', 'Number of scaling events', ['app', 'direction'])
+        self.scaling_decisions = Counter('CONTAINER_ORCH_scaling_decisions_total', 'Number of scaling decisions', ['app', 'action'])
         
         # Health check metrics
-        self.health_checks = Counter('orchestry_health_checks_total', 'Number of health checks', ['app', 'status'])
-        self.health_check_duration = Histogram('orchestry_health_check_duration_seconds', 'Health check duration', ['app'])
+        self.health_checks = Counter('CONTAINER_ORCH_health_checks_total', 'Number of health checks', ['app', 'status'])
+        self.health_check_duration = Histogram('CONTAINER_ORCH_health_check_duration_seconds', 'Health check duration', ['app'])
         
         # Nginx metrics
-        self.nginx_reloads = Counter('orchestry_nginx_reloads_total', 'Number of nginx reloads', ['status'])
-        self.nginx_upstreams = Gauge('orchestry_nginx_upstreams', 'Number of nginx upstreams', ['app'])
+        self.nginx_reloads = Counter('CONTAINER_ORCH_nginx_reloads_total', 'Number of nginx reloads', ['status'])
+        self.nginx_upstreams = Gauge('CONTAINER_ORCH_nginx_upstreams', 'Number of nginx upstreams', ['app'])
         
     def add_metric(self, name: str, value: float, labels: Dict[str, str] = None, metric_type: str = "gauge"):
         """Add a metric measurement to the buffer."""

@@ -565,7 +565,7 @@ class DatabasePool:
                     max_size=self.config.get('pool_max_size', 20),
                     command_timeout=self.config.get('command_timeout', 30),
                     server_settings={
-                        'application_name': 'orchestry_controller',
+                        'application_name': 'CONTAINER_ORCH_controller',
                         'jit': 'off'  # Disable JIT for better predictability
                     }
                 )
@@ -588,7 +588,7 @@ class DatabasePool:
                         max_size=self.config.get('pool_max_size', 10),
                         command_timeout=self.config.get('command_timeout', 30),
                         server_settings={
-                            'application_name': 'orchestry_controller_read',
+                            'application_name': 'CONTAINER_ORCH_controller_read',
                             'default_transaction_isolation': 'repeatable_read'
                         }
                     )

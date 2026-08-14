@@ -105,7 +105,7 @@ dev = [
 # Start PostgreSQL with Docker
 docker run -d \
     --name orchestry-postgres \
-    -e POSTGRES_DB=orchestry_dev \
+    -e POSTGRES_DB=CONTAINER_ORCH_dev \
     -e POSTGRES_USER=orchestry \
     -e POSTGRES_PASSWORD=development_password \
     -p 5432:5432 \
@@ -115,7 +115,7 @@ docker run -d \
 sleep 10
 
 # Initialize database schema
-python -m cli.main db init --connection-string "postgresql://orchestry:development_password@localhost:5432/orchestry_dev"
+python -m cli.main db init --connection-string "postgresql://orchestry:development_password@localhost:5432/CONTAINER_ORCH_dev"
 ```
 
 ### 5. Configuration
@@ -136,7 +136,7 @@ database:
     port: 5432
     user: orchestry
     password: development_password
-    database: orchestry_dev
+    database: CONTAINER_ORCH_dev
   
   replica:
     enabled: false
@@ -229,8 +229,8 @@ from state.db import DatabaseManager
 source venv/bin/activate
 
 # Set development environment
-export ORCHESTRY_ENV=development
-export ORCHESTRY_CONFIG=~/.config/orchestry/development.yml
+export CONTAINER_ORCH_ENV=development
+export CONTAINER_ORCH_CONFIG=~/.config/orchestry/development.yml
 
 # Start the controller in development mode
 python -m controller.main --reload --debug
@@ -254,8 +254,8 @@ set -e
 source venv/bin/activate
 
 # Set development environment variables
-export ORCHESTRY_ENV=development
-export ORCHESTRY_CONFIG=~/.config/orchestry/development.yml
+export CONTAINER_ORCH_ENV=development
+export CONTAINER_ORCH_CONFIG=~/.config/orchestry/development.yml
 export PYTHONPATH=$PWD:$PYTHONPATH
 
 # Start development server
@@ -677,8 +677,8 @@ Create `.vscode/launch.json`:
             "args": ["--debug"],
             "console": "integratedTerminal",
             "env": {
-                "ORCHESTRY_ENV": "development",
-                "ORCHESTRY_CONFIG": "${env:HOME}/.config/orchestry/development.yml",
+                "CONTAINER_ORCH_ENV": "development",
+                "CONTAINER_ORCH_CONFIG": "${env:HOME}/.config/orchestry/development.yml",
                 "PYTHONPATH": "${workspaceFolder}"
             },
             "cwd": "${workspaceFolder}",
@@ -692,8 +692,8 @@ Create `.vscode/launch.json`:
             "args": ["--help"],
             "console": "integratedTerminal",
             "env": {
-                "ORCHESTRY_ENV": "development",
-                "ORCHESTRY_CONFIG": "${env:HOME}/.config/orchestry/development.yml"
+                "CONTAINER_ORCH_ENV": "development",
+                "CONTAINER_ORCH_CONFIG": "${env:HOME}/.config/orchestry/development.yml"
             },
             "cwd": "${workspaceFolder}"
         },

@@ -567,7 +567,7 @@ The system prevents split-brain scenarios through:
 # Controller cluster configuration
 CLUSTER_NODE_ID=controller-1              # Unique node identifier
 CLUSTER_HOSTNAME=controller-1.local       # Node hostname
-ORCHESTRY_PORT=8001                       # API port for this node
+CONTAINER_ORCH_PORT=8001                       # API port for this node
 
 # Timing configuration  
 CLUSTER_LEASE_TTL=30                      # Leadership lease duration (seconds)
@@ -591,7 +591,7 @@ docker run -d \
   --network orchestry \
   -e CLUSTER_NODE_ID=controller-1 \
   -e CLUSTER_HOSTNAME=controller-1 \
-  -e ORCHESTRY_PORT=8001 \
+  -e CONTAINER_ORCH_PORT=8001 \
   -p 8001:8001 \
   orchestry-controller
 ```

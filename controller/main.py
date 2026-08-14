@@ -77,31 +77,31 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
     
     # Get host and port from environment variables or command line args
-    host = args.host or os.getenv("ORCHESTRY_HOST")
+    host = args.host or os.getenv("CONTAINER_ORCH_HOST")
     if not host:
-        logger.error("ORCHESTRY_HOST environment variable is required. Please set it in .env file.")
+        logger.error("CONTAINER_ORCH_HOST environment variable is required. Please set it in .env file.")
         sys.exit(1)
         
-    port = args.port or (int(os.getenv("ORCHESTRY_PORT")) if os.getenv("ORCHESTRY_PORT") else None)
+    port = args.port or (int(os.getenv("CONTAINER_ORCH_PORT")) if os.getenv("CONTAINER_ORCH_PORT") else None)
     if port is None:
-        logger.error("ORCHESTRY_PORT environment variable is required. Please set it in .env file.")
+        logger.error("CONTAINER_ORCH_PORT environment variable is required. Please set it in .env file.")
         sys.exit(1)
     
     logger.info("Starting Orchestry Controller...")
     logger.info(f"API will be available at http://{host}:{port}")
     
     # Set environment variables that components will use
-    db_path = args.db_path or os.getenv("ORCHESTRY_DB_PATH")  # For backward compatibility, but not used
+    db_path = args.db_path or os.getenv("CONTAINER_ORCH_DB_PATH")  # For backward compatibility, but not used
     
-    nginx_container = args.nginx_container or os.getenv("ORCHESTRY_NGINX_CONTAINER")
+    nginx_container = args.nginx_container or os.getenv("CONTAINER_ORCH_NGINX_CONTAINER")
     if not nginx_container:
-        logger.error("ORCHESTRY_NGINX_CONTAINER environment variable is required. Please set it in .env file.")
+        logger.error("CONTAINER_ORCH_NGINX_CONTAINER environment variable is required. Please set it in .env file.")
         sys.exit(1)
     
     # Keep for backward compatibility with any legacy scripts
     if db_path:
-        os.environ["ORCHESTRY_DB_PATH"] = db_path
-    os.environ["ORCHESTRY_NGINX_CONTAINER"] = nginx_container
+        os.environ["CONTAINER_ORCH_DB_PATH"] = db_path
+    os.environ["CONTAINER_ORCH_NGINX_CONTAINER"] = nginx_container
     
     logger.info(f"Database: PostgreSQL HA Cluster (postgres-primary -> postgres-replica)")
     logger.info(f"Nginx container: {nginx_container}")

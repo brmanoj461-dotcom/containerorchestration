@@ -307,7 +307,7 @@ async def startup_event():
         cluster_controller = DistributedController(
             node_id=os.getenv("CLUSTER_NODE_ID"),
             hostname=os.getenv("CLUSTER_HOSTNAME", "localhost"),
-            port=int(os.getenv("ORCHESTRY_PORT", "8000")),
+            port=int(os.getenv("CONTAINER_ORCH_PORT", "8000")),
             db_manager=state_store
         )
         

@@ -21,16 +21,16 @@ class DockerNginxManager:
     def __init__(self, nginx_container_name: str = None, conf_dir: str = None, template_path: str = "configs/nginx_template.conf"):
         self.docker_client = docker.from_env()
 
-        self.nginx_container_name = nginx_container_name or os.getenv("ORCHESTRY_NGINX_CONTAINER")
+        self.nginx_container_name = nginx_container_name or os.getenv("CONTAINER_ORCH_NGINX_CONTAINER")
         if not self.nginx_container_name:
-            logger.error("ORCHESTRY_NGINX_CONTAINER environment variable is required. Please set it in .env file.")
-            raise RuntimeError("Missing required environment variable: ORCHESTRY_NGINX_CONTAINER")
-        conf_dir_name = os.getenv("ORCHESTRY_NGINX_CONF_DIR")
+            logger.error("CONTAINER_ORCH_NGINX_CONTAINER environment variable is required. Please set it in .env file.")
+            raise RuntimeError("Missing required environment variable: CONTAINER_ORCH_NGINX_CONTAINER")
+        conf_dir_name = os.getenv("CONTAINER_ORCH_NGINX_CONF_DIR")
         if conf_dir_name:
             self.conf_dir = Path(conf_dir_name)
         else:
-            logger.error("ORCHESTRY_NGINX_CONF_DIR environment variable is required. Please set it in .env file.")
-            raise RuntimeError("Missing required environment variable: ORCHESTRY_NGINX_CONF_DIR")
+            logger.error("CONTAINER_ORCH_NGINX_CONF_DIR environment variable is required. Please set it in .env file.")
+            raise RuntimeError("Missing required environment variable: CONTAINER_ORCH_NGINX_CONF_DIR")
         self.template_path = template_path or "configs/nginx_template.conf"
         self._load_template()
 

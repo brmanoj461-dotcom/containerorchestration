@@ -12,18 +12,18 @@ load_dotenv()
 
 app = typer.Typer(name="orchestry", help="Orchestry SDK CLI")
 
-ORCHESTRY_URL = helpers.load_config()
+CONTAINER_ORCH_URL = helpers.load_config()
 
 @app.command()
 def config():
-    """Configure orchestry by adding ORCHESTRY_HOST and orchestry_PORT"""
+    """Configure orchestry by adding CONTAINER_ORCH_HOST and CONTAINER_ORCH_PORT"""
     typer.echo("To configure orchestry, please enter the following details:")
-    ORCHESTRY_HOST = typer.prompt("Host (e.g., localhost or an IP address)")
-    ORCHESTRY_PORT = typer.prompt("Port (e.g., 8000)")
+    CONTAINER_ORCH_HOST = typer.prompt("Host (e.g., localhost or an IP address)")
+    CONTAINER_ORCH_PORT = typer.prompt("Port (e.g., 8000)")
 
-    typer.echo(f"Connecting to orchestry at http://{ORCHESTRY_HOST}:{ORCHESTRY_PORT}...")
-    if helpers.check_service_running(f"http://{ORCHESTRY_HOST}:{ORCHESTRY_PORT}") == True:
-        helpers.save_config(ORCHESTRY_HOST, ORCHESTRY_PORT)
+    typer.echo(f"Connecting to orchestry at http://{CONTAINER_ORCH_HOST}:{CONTAINER_ORCH_PORT}...")
+    if helpers.check_service_running(f"http://{CONTAINER_ORCH_HOST}:{CONTAINER_ORCH_PORT}") == True:
+        helpers.save_config(CONTAINER_ORCH_HOST, CONTAINER_ORCH_PORT)
         typer.echo(f"Configuration saved to {helpers.CONFIG_FILE}")
     else:
         typer.echo("Failed to connect to the specified host and port. Please ensure the orchestry controller is running.", err=True)
@@ -32,7 +32,7 @@ def config():
 @app.command()
 def register(config: str):
     """Register an app from YAML/JSON spec."""
-    if helpers.check_service_running(ORCHESTRY_URL) == False:
+    if helpers.check_service_running(CONTAINER_ORCH_URL) == False:
         typer.echo(" orchestry controller is not running, run 'orchestry config' to configure", err=True)
         raise typer.Exit(1)
     if not os.path.exists(config):
@@ -47,7 +47,7 @@ def register(config: str):
                 spec = json.load(f)
 
         response = requests.post(
-            f"{ORCHESTRY_URL}/apps/register",
+            f"{CONTAINER_ORCH_URL}/apps/register",
             json=spec,
             headers={"Content-Type": "application/json"}
         )
@@ -67,28 +67,28 @@ def register(config: str):
 @app.command()
 def up(name: str):
     """Start the app."""
-    if helpers.check_service_running(ORCHESTRY_URL) == False:
+    if helpers.check_service_running(CONTAINER_ORCH_URL) == False:
         typer.echo(" orchestry controller is not running, run 'orchestry config' to configure", err=True)
         raise typer.Exit(1)
 
-    response = requests.post(f"{ORCHESTRY_URL}/apps/{name}/up")
+    response = requests.post(f"{CONTAINER_ORCH_URL}/apps/{name}/up")
     res = response.json()
     typer.echo(json.dumps(res, indent=2))
 
 @app.command()
 def down(name: str):
     """Stop the app."""
-    if helpers.check_service_running(ORCHESTRY_URL) == False:
+    if helpers.check_service_running(CONTAINER_ORCH_URL) == False:
         typer.echo(" orchestry controller is not running, run 'orchestry config' to configure", err=True)
         raise typer.Exit(1)
-    response = requests.post(f"{ORCHESTRY_URL}/apps/{name}/down")
+    response = requests.post(f"{CONTAINER_ORCH_URL}/apps/{name}/down")
     res = response.json()
     typer.echo(json.dumps(res, indent=2))
 
 @app.command()
 def delete(name: str, force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt")):
     """Delete an application completely."""
-    if helpers.check_service_running(ORCHESTRY_URL) == False:
+    if helpers.check_service_running(CONTAINER_ORCH_URL) == False:
         typer.echo(" orchestry controller is not running, run 'orchestry config' to configure", err=True)
         raise typer.Exit(1)
     
@@ -100,7 +100,7 @@ def delete(name: str, force: bool = typer.Option(False, "--force", "-f", help="S
             raise typer.Exit(0)
     
     try:
-        response = requests.delete(f"{ORCHESTRY_URL}/apps/{name}")
+        response = requests.delete(f"{CONTAINER_ORCH_URL}/apps/{name}")
         
         if response.status_code == 200:
             res = response.json()
@@ -122,23 +122,23 @@ def delete(name: str, force: bool = typer.Option(False, "--force", "-f", help="S
 @app.command()
 def status(name: str):
     """Check app status."""
-    if helpers.check_service_running(ORCHESTRY_URL) == False:
+    if helpers.check_service_running(CONTAINER_ORCH_URL) == False:
         typer.echo(" orchestry controller is not running, run 'orchestry config' to configure", err=True)
         raise typer.Exit(1)
 
-    response = requests.get(f"{ORCHESTRY_URL}/apps/{name}/status")
+    response = requests.get(f"{CONTAINER_ORCH_URL}/apps/{name}/status")
     res = response.json()
     typer.echo(json.dumps(res, indent=2))
 
 @app.command()
 def scale(name: str, replicas: int):
     """Scale app to specific replica count."""
-    if helpers.check_service_running(ORCHESTRY_URL) == False:
+    if helpers.check_service_running(CONTAINER_ORCH_URL) == False:
         typer.echo(" orchestry controller is not running, run 'orchestry config' to configure", err=True)
         raise typer.Exit(1)
 
     try:
-        info_response = requests.get(f"{ORCHESTRY_URL}/apps/{name}/status")
+        info_response = requests.get(f"{CONTAINER_ORCH_URL}/apps/{name}/status")
         if info_response.status_code == 404:
             typer.echo(f" App '{name}' not found", err=True)
             raise typer.Exit(1)
@@ -155,7 +155,7 @@ def scale(name: str, replicas: int):
             typer.echo(f"  Scaling '{name}' to {replicas} replicas (auto mode - may be overridden by autoscaler)")
 
         response = requests.post(
-            f"{ORCHESTRY_URL}/apps/{name}/scale",
+            f"{CONTAINER_ORCH_URL}/apps/{name}/scale",
             json={"replicas": replicas}
         )
 
@@ -179,25 +179,25 @@ def scale(name: str, replicas: int):
 @app.command()
 def list():
     """List all applications.""" 
-    if helpers.check_service_running(ORCHESTRY_URL) == False:
+    if helpers.check_service_running(CONTAINER_ORCH_URL) == False:
         typer.echo(" orchestry controller is not running, run 'orchestry config' to configure", err=True)
         raise typer.Exit(1)
 
-    response = requests.get(f"{ORCHESTRY_URL}/apps")
+    response = requests.get(f"{CONTAINER_ORCH_URL}/apps")
     res = response.json()
     typer.echo(json.dumps(res, indent=2))
 
 @app.command()
 def metrics(name: Optional[str] = None):
     """Get system or app metrics."""
-    if helpers.check_service_running(ORCHESTRY_URL) == False:
+    if helpers.check_service_running(CONTAINER_ORCH_URL) == False:
         typer.echo(" orchestry controller is not running, run 'orchestry config' to configure", err=True)
         raise typer.Exit(1)
 
     if name:
-        response = requests.get(f"{ORCHESTRY_URL}/apps/{name}/metrics")
+        response = requests.get(f"{CONTAINER_ORCH_URL}/apps/{name}/metrics")
     else:
-        response = requests.get(f"{ORCHESTRY_URL}/metrics")
+        response = requests.get(f"{CONTAINER_ORCH_URL}/metrics")
 
     res = response.json()
     typer.echo(json.dumps(res, indent=2))
@@ -206,12 +206,12 @@ def metrics(name: Optional[str] = None):
 def info():
     """Show orchestry system information and status."""
     try:
-        response = requests.get(f"{ORCHESTRY_URL}/health", timeout=5)
+        response = requests.get(f"{CONTAINER_ORCH_URL}/health", timeout=5)
         if response.status_code == 200:
             typer.echo(" orchestry Controller: Running")
-            typer.echo(f"   API: {ORCHESTRY_URL}")
+            typer.echo(f"   API: {CONTAINER_ORCH_URL}")
 
-            apps_response = requests.get(f"{ORCHESTRY_URL}/apps")
+            apps_response = requests.get(f"{CONTAINER_ORCH_URL}/apps")
             if apps_response.status_code == 200:
                 apps = apps_response.json()
                 typer.echo(f"   Apps: {len(apps)} registered")
@@ -239,12 +239,12 @@ def info():
 @app.command()
 def spec(name: str, raw: bool = False):
     """Get app specification. Use --raw to see the original submitted spec."""
-    if helpers.check_service_running(ORCHESTRY_URL) == False:
+    if helpers.check_service_running(CONTAINER_ORCH_URL) == False:
         typer.echo(" orchestry controller is not running, run 'orchestry config' to configure", err=True)
         raise typer.Exit(1)
 
     try:
-        response = requests.get(f"{ORCHESTRY_URL}/apps/{name}/raw")
+        response = requests.get(f"{CONTAINER_ORCH_URL}/apps/{name}/raw")
         if response.status_code == 404:
             typer.echo(f" App '{name}' not found", err=True)
             raise typer.Exit(1)
@@ -276,12 +276,12 @@ def logs(
     follow: bool = typer.Option(False, "--follow", "-f", help="Follow log output (not yet implemented)")
 ):
     """Get logs for an application."""
-    if helpers.check_service_running(ORCHESTRY_URL) == False:
+    if helpers.check_service_running(CONTAINER_ORCH_URL) == False:
         typer.echo(" orchestry controller is not running, run 'orchestry config' to configure", err=True)
         raise typer.Exit(1)
 
     try:
-        response = requests.get(f"{ORCHESTRY_URL}/apps/{name}/logs", params={"lines": lines})
+        response = requests.get(f"{CONTAINER_ORCH_URL}/apps/{name}/logs", params={"lines": lines})
 
         if response.status_code == 404:
             typer.echo(f" App '{name}' not found or not running", err=True)
@@ -328,12 +328,12 @@ def logs(
 @app.command()
 def cluster(opts: str):
     """Get cluster information(status, leader, health)"""
-    if helpers.check_service_running(ORCHESTRY_URL) == False:
+    if helpers.check_service_running(CONTAINER_ORCH_URL) == False:
         typer.echo(" orchestry controller is not running, run 'orchestry config' to configure", err=True)
         raise typer.Exit(1)
 
     try:
-        response = requests.get(f"{ORCHESTRY_URL}/cluster/{opts}")
+        response = requests.get(f"{CONTAINER_ORCH_URL}/cluster/{opts}")
         if response.status_code == 404:
             typer.echo(f"Cluster '{opts}' not found", err=True)
             raise typer.Exit(1)
@@ -352,12 +352,12 @@ def cluster(opts: str):
 @app.command()
 def events():
     """Get recent events"""
-    if helpers.check_service_running(ORCHESTRY_URL) == False:
+    if helpers.check_service_running(CONTAINER_ORCH_URL) == False:
         typer.echo(" orchestry controller is not running, run 'orchestry config' to configure", err=True)
         raise typer.Exit(1)
 
     try:
-        response = requests.get(f"{ORCHESTRY_URL}/events")
+        response = requests.get(f"{CONTAINER_ORCH_URL}/events")
         if response.status_code != 200:
             typer.echo(f" Error: {response.json()}", err=True)
             raise typer.Exit(1)
@@ -372,7 +372,7 @@ def events():
 
 
 if __name__ == "__main__":
-    if not ORCHESTRY_URL:
+    if not CONTAINER_ORCH_URL:
         typer.echo("orchestry is not configured. Please run 'orchestry config' to set it up.", err=True)
         raise typer.Exit(1)
     app()

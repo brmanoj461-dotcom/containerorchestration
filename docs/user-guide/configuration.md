@@ -19,10 +19,10 @@ Configure the main Orchestry controller:
 
 ```bash
 # API Server Configuration
-ORCHESTRY_HOST=0.0.0.0              # Bind address (default: 0.0.0.0)
-ORCHESTRY_PORT=8000                 # API port (default: 8000)
-# ORCHESTRY_WORKERS=4                 # Number of worker processes
-ORCHESTRY_LOG_LEVEL=INFO            # Logging level (DEBUG, INFO, WARN, ERROR)
+CONTAINER_ORCH_HOST=0.0.0.0              # Bind address (default: 0.0.0.0)
+CONTAINER_ORCH_PORT=8000                 # API port (default: 8000)
+# CONTAINER_ORCH_WORKERS=4                 # Number of worker processes
+CONTAINER_ORCH_LOG_LEVEL=INFO            # Logging level (DEBUG, INFO, WARN, ERROR)
 
 # Controller Settings
 CONTROLLER_NODE_ID=controller-1     # Unique node identifier
@@ -40,7 +40,7 @@ POSTGRES_HOST=localhost             # Database host
 POSTGRES_PORT=5432                  # Database port
 POSTGRES_DB=orchestry              # Database name
 POSTGRES_USER=orchestry            # Database username
-POSTGRES_PASSWORD=orchestry_password # Database password
+POSTGRES_PASSWORD=CONTAINER_ORCH_password # Database password
 
 # Connection Pool
 POSTGRES_POOL_SIZE=10              # Maximum connections
@@ -170,7 +170,7 @@ database:
     port: 5432
     name: "orchestry"
     user: "orchestry"
-    password: "orchestry_password"
+    password: "CONTAINER_ORCH_password"
     pool_size: 10
     timeout: 30
   replica:
@@ -266,7 +266,7 @@ Create `.env.development`:
 ```bash
 # Development Environment
 NODE_ENV=development
-ORCHESTRY_LOG_LEVEL=DEBUG
+CONTAINER_ORCH_LOG_LEVEL=DEBUG
 
 # Relaxed Settings
 SCALE_CHECK_INTERVAL=60
@@ -276,7 +276,7 @@ DEFAULT_MAX_REPLICAS=3
 
 # Local Database
 POSTGRES_HOST=localhost
-POSTGRES_DB=orchestry_dev
+POSTGRES_DB=CONTAINER_ORCH_dev
 
 # Development Features
 METRICS_ENABLED=false
@@ -290,7 +290,7 @@ Create `.env.production`:
 ```bash
 # Production Environment
 NODE_ENV=production
-ORCHESTRY_LOG_LEVEL=INFO
+CONTAINER_ORCH_LOG_LEVEL=INFO
 
 # Optimized Settings
 SCALE_CHECK_INTERVAL=15
@@ -300,7 +300,7 @@ DEFAULT_MAX_REPLICAS=20
 
 # Production Database
 POSTGRES_HOST=postgres-cluster.example.com
-POSTGRES_DB=orchestry_prod
+POSTGRES_DB=CONTAINER_ORCH_prod
 POSTGRES_POOL_SIZE=20
 
 # High Availability
@@ -316,7 +316,7 @@ Create `.env.staging`:
 ```bash
 # Staging Environment
 NODE_ENV=staging
-ORCHESTRY_LOG_LEVEL=INFO
+CONTAINER_ORCH_LOG_LEVEL=INFO
 
 # Moderate Settings
 SCALE_CHECK_INTERVAL=30
@@ -326,7 +326,7 @@ DEFAULT_MAX_REPLICAS=10
 
 # Staging Database
 POSTGRES_HOST=postgres-staging.example.com
-POSTGRES_DB=orchestry_staging
+POSTGRES_DB=CONTAINER_ORCH_staging
 
 # Testing Features
 METRICS_ENABLED=true
@@ -346,8 +346,8 @@ services:
     build: .
     container_name: orchestry-controller
     environment:
-      - ORCHESTRY_HOST=0.0.0.0
-      - ORCHESTRY_PORT=8000
+      - CONTAINER_ORCH_HOST=0.0.0.0
+      - CONTAINER_ORCH_PORT=8000
       - POSTGRES_HOST=postgres-primary
       - POSTGRES_DB=orchestry
       - POSTGRES_USER=orchestry
@@ -427,7 +427,7 @@ services:
       - POSTGRES_POOL_SIZE=20
       - SCALE_CHECK_INTERVAL=15
     configs:
-      - source: orchestry_config
+      - source: CONTAINER_ORCH_config
         target: /etc/orchestry/config.yaml
     secrets:
       - postgres_password
@@ -502,7 +502,7 @@ services:
       - monitoring
 
 configs:
-  orchestry_config:
+  CONTAINER_ORCH_config:
     file: ./configs/orchestry/config.yaml
   nginx_config:
     file: ./configs/nginx/nginx.conf
@@ -683,7 +683,7 @@ POSTGRES_CHECKPOINT_SEGMENTS=32   # Checkpoint segments
 
 ```bash
 # Controller Optimization
-ORCHESTRY_WORKERS=8               # Number of worker processes
+CONTAINER_ORCH_WORKERS=8               # Number of worker processes
 UVICORN_WORKER_CLASS=uvicorn.workers.UvicornWorker
 UVICORN_WORKER_CONNECTIONS=1000   # Connections per worker
 UVICORN_BACKLOG=2048             # Listen backlog
@@ -739,7 +739,7 @@ scrape_configs:
         "type": "stat",
         "targets": [
           {
-            "expr": "orchestry_applications_total"
+            "expr": "CONTAINER_ORCH_applications_total"
           }
         ]
       },
@@ -748,7 +748,7 @@ scrape_configs:
         "type": "graph",
         "targets": [
           {
-            "expr": "rate(orchestry_scaling_events_total[5m])"
+            "expr": "rate(CONTAINER_ORCH_scaling_events_total[5m])"
           }
         ]
       }
@@ -763,8 +763,8 @@ scrape_configs:
 
 ```bash
 # Enable debug mode
-ORCHESTRY_LOG_LEVEL=DEBUG
-ORCHESTRY_DEBUG=true
+CONTAINER_ORCH_LOG_LEVEL=DEBUG
+CONTAINER_ORCH_DEBUG=true
 DEBUG_METRICS=true
 DEBUG_SCALING=true
 DEBUG_HEALTH_CHECKS=true

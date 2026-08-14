@@ -18,12 +18,12 @@ RUN mkdir -p /app/data /app/logs /nginx-config && \
     chmod 755 /app/logs /app/data
 
 ENV PYTHONPATH=/app
-ENV ORCHESTRY_DB_PATH=/app/data/autoscaler.db
-ENV ORCHESTRY_NGINX_CONTAINER=orchestry-nginx
+ENV CONTAINER_ORCH_DB_PATH=/app/data/autoscaler.db
+ENV CONTAINER_ORCH_NGINX_CONTAINER=orchestry-nginx
 
 EXPOSE 8000 8001 8002 8003
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${ORCHESTRY_PORT:-8000}/health || exit 1
+    CMD curl -f http://localhost:${CONTAINER_ORCH_PORT:-8000}/health || exit 1
 
 CMD ["python", "controller/main.py"]

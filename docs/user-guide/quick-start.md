@@ -248,15 +248,15 @@ Configure Orchestry behavior with environment variables:
 
 ```bash
 # Controller API settings
-export ORCHESTRY_HOST=localhost
-export ORCHESTRY_PORT=8000
+export CONTAINER_ORCH_HOST=localhost
+export CONTAINER_ORCH_PORT=8000
 
 # Database settings
 export POSTGRES_HOST=localhost
 export POSTGRES_PORT=5432
 export POSTGRES_DB=orchestry
 export POSTGRES_USER=orchestry
-export POSTGRES_PASSWORD=orchestry_password
+export POSTGRES_PASSWORD=CONTAINER_ORCH_password
 
 # Scaling settings
 export DEFAULT_SCALE_CHECK_INTERVAL=30

@@ -52,7 +52,7 @@ class PostgreSQLDBViewer:
                  replica_port: int = 5433,
                  database: str = "orchestry",
                  username: str = "orchestry",
-                 password: str = "orchestry_password",
+                 password: str = "CONTAINER_ORCH_password",
                  target_db: str = "primary"):
         
         self.primary_dsn = f"host={primary_host} port={primary_port} dbname={database} user={username} password={password}"
@@ -531,8 +531,8 @@ Examples:
                        help='Database username (default: orchestry)')
                        
     parser.add_argument('--password', 
-                       default='orchestry_password',
-                       help='Database password (default: orchestry_password)')
+                       default='CONTAINER_ORCH_password',
+                       help='Database password (default: CONTAINER_ORCH_password)')
                        
     parser.add_argument('--app', 
                        help='Filter by application name')
