@@ -1,63 +1,55 @@
-# <img src="docs/images/l0g0.png" alt="Orchestry logo" height="28" style="height:1em; vertical-align:-0.2em; margin-right:0.25em;"> Orchestry
+# Container Orchestration Engine
 
-Lightweight container orchestration and auto-scaling platform for web applications.
-
-### What is Orchestry?
-
-Orchestry is a container orchestration platform that provides:
-
-**Intelligent Auto-Scaling**: Automatically scales your applications based on CPU, memory, RPS, latency, and connection metrics
-
-**Load Balancing**: Dynamic Nginx configuration with health-aware routing
-
-**Health Monitoring**: Continuous health checks with automatic recovery
-
-**Simple Deployment**: YAML-based application specifications
-
-**RESTful API**: Complete programmatic control
-
-**High Availability**: Distributed controller with leader election eliminates single points of failure
-
-**Database HA**: PostgreSQL-based state management with primary-replica replication
-
-## Key Features
-
-**Container Orchestration**: Docker-based application lifecycle management
-
-**Multi-Metric Auto-Scaling**: CPU, memory, RPS, latency, and connection-based scaling
-
-**Dynamic Load Balancing**: Nginx with health-aware routing and SSL termination
-
-**Health Monitoring**: Continuous health checks with automatic recovery
-
-**Distributed Architecture**: 3-node controller cluster with leader election
-
-**High Availability**: Automatic failover and split-brain prevention
-
-**CLI and REST API**: Complete programmatic and command-line interfaces
-
-**Persistent State**: PostgreSQL with primary-replica setup
-
-**Event Logging**: Complete audit trail and cluster event tracking
-
-**Resource Management**: CPU/memory constraints and intelligent scaling policies
-
-## Documentation
-
-- Orchestry Docs: https://admincodes7.github.io/Orchestry/
-
-Quick links on the site:
-
-- Quick Start: https://admincodes7.github.io/Orchestry/user-guide/quick-start/
-- CLI Reference: https://admincodes7.github.io/Orchestry/user-guide/cli-reference/
-- API Reference: https://admincodes7.github.io/Orchestry/user-guide/api-reference/
-- Architecture Overview: https://admincodes7.github.io/Orchestry/developer-guide/architecture/
+A high-availability, lightweight container orchestration and multi-metric auto-scaling platform built for modern microservices.
 
 ---
 
-## License
+## 🚀 Overview
 
-This project is licensed under the [GNU GPLv3](LICENSE).
+**Container Orchestration Engine** is an enterprise-grade container management platform designed to automate application lifecycle management, dynamic scaling, and fault tolerance across containerized workloads.
 
+Whether deploying single web services or multi-node microservices, the engine provides complete operational control through a unified CLI, RESTful API, and high-availability distributed controller architecture.
 
-Orchestry — built for simplicity, designed for scale.
+---
+
+## ✨ Key Features
+
+* **Intelligent Multi-Metric Auto-Scaling**: Dynamic horizontal scaling based on real-time CPU utilization, memory pressure, RPS (requests per second), latency thresholds, and active connections.
+* **Dynamic Load Balancing**: Automated Nginx configuration management with health-aware traffic routing and SSL termination.
+* **Proactive Health Monitoring**: Continuous container health probes paired with automated instance recovery and failover policies.
+* **High-Availability (HA) Controller Cluster**: Distributed 3-node controller consensus using leader election to eliminate single points of failure and prevent split-brain scenarios.
+* **Persistent State Management**: High-availability PostgreSQL backend featuring primary-replica data replication and instant recovery.
+* **Declarative Deployments**: Simple, customizable YAML-based application specification files for seamless deployment setup.
+* **Full Developer Interface**: Complete administrative control provided via both a CLI tool and an OpenAPI-compliant REST API.
+* **Audit & Event Tracking**: Comprehensive event log streams and audit trails for detailed cluster activity monitoring.
+
+---
+
+## 📐 Architecture Overview
+
+```text
+                        +------------------------+
+                        |  CLI / REST API Client |
+                        +-----------+------------+
+                                    |
+                                    v
+                        +------------------------+
+                        |  Nginx Load Balancer   |
+                        +-----------+------------+
+                                    |
+              +---------------------+---------------------+
+              |                     |                     |
+              v                     v                     v
+     +------------------+  +------------------+  +------------------+
+     | Controller Node 1|  | Controller Node 2|  | Controller Node 3|
+     |    (Leader)      |  |    (Follower)    |  |    (Follower)    |
+     +--------+---------+  +--------+---------+  +--------+---------+
+              |                     |                     |
+              +---------------------+---------------------+
+                                    |
+                                    v
+                        +------------------------+
+                        | High-Availability DB   |
+                        | PostgreSQL Primary /   |
+                        |        Replica         |
+                        +------------------------+
