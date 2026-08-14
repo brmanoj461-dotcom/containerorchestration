@@ -3,12 +3,12 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "orchestry"
-version = "1.0.1"
-description = "Orchestry - Automatic orchestration, scaling and load balancing for containerized applications"
-authors = [{name = "Hemanth S Banur", email = "arjunbanur27@gmail.com"}]
+name = "container-orchestration-engine"
+version = "0.1.0"
+description = "Orchestry - "A lightweight container orchestration and clustering tool"
+authors = [{name = "Manoj BR", email = "brmanoj461@gmail.com"}]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = "GPL-3.0-or-later"
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -36,5 +36,5 @@ packages = [
 orchestry = "cli.main:app"
 
 [project.urls]
-Homepage = "https://admincodes7.github.io/Orchestry/"
-Repository = "https://github.com/admincodes7/Orchestry"
+Homepage = "https://github.com/brmanoj461-dotcom/containerorchestration"
+Repository =  "https://github.com/brmanoj461-dotcom/containerorchestration"
