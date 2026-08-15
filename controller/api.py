@@ -1,54 +1,72 @@
 import logging
 import time
+from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Optional
+
 import docker
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from functools import wraps
-from dotenv import load_dotenv
 
-from .scaler import ScalingMetrics, ScalingPolicy
-from controller.utils.models import (
-    AppSpec,
-    ScaleRequest,
-    PolicyRequest,
-    SimulatedMetricsRequest,
-    AppRegistrationResponse,
-    AppStatusResponse
-)
+from controller.scaler import ScalingMetrics, ScalingPolicy
 from controller.utils import lifecycle
+from controller.utils.models import (
+    AppRegistrationResponse,
+    AppSpec,
+    AppStatusResponse,
+    PolicyRequest,
+    ScaleRequest,
+    SimulatedMetricsRequest,
+)
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+
 def leader_required(f):
-    """Decorator to ensure only the leader can execute certain operations"""
+    """Decorator to ensure only the cluster leader executes operations."""
     @wraps(f)
     async def decorated_function(*args, **kwargs):
         cluster_controller = get_cluster_controller()
         if cluster_controller and not cluster_controller.is_leader:
             leader_info = cluster_controller.get_leader_info()
             if leader_info:
-                # Instead of redirecting, return 503 to let load balancer try next controller
+                leader_id = leader_info.get("leader_id", "unknown")
+                # Return 503 so load balancer/clients can route to the active leader
                 raise HTTPException(
-                    status_code=503, 
-                    detail=f"Not the leader. Leader is: {leader_info.get('leader_id', 'unknown')}",
-                    headers={"X-Current-Leader": leader_info.get('leader_id', 'unknown')}
+                    status_code=503,
+                    detail=f"Not the leader. Leader is: {leader_id}",
+                    headers={"X-Current-Leader": str(leader_id)},
                 )
             else:
                 raise HTTPException(
-                    status_code=503, 
-                    detail="No leader elected, cluster not ready"
+                    status_code=503,
+                    detail="No leader elected, cluster not ready",
                 )
         return await f(*args, **kwargs)
     return decorated_function
 
-# FastAPI app
+
+# Lifespan context manager replacing deprecated @app.on_event
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application startup and shutdown lifecycles cleanly."""
+    logger.info("Initializing Orchestry Controller components...")
+    await lifecycle.startup_event()
+    yield
+    logger.info("Shutting down Orchestry Controller components...")
+    await lifecycle.shutdown_event()
+
+
+# FastAPI App
 app = FastAPI(
     title="Orchestry Controller API",
     description="Autoscaling controller API",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -59,16 +77,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize all components when the API starts."""
-    await lifecycle.startup_event()
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Clean up resources when shutting down."""
-    await lifecycle.shutdown_event()
-
+# Helper Getters
 def get_app_manager():
     return lifecycle.get_app_manager()
 
@@ -88,26 +98,33 @@ def get_cluster_controller():
     return lifecycle.get_cluster_controller()
 
 
+def _to_dict(model_or_dict):
+    """Utility to safely extract dictionary from Pydantic v1/v2 models or raw dicts."""
+    if hasattr(model_or_dict, "model_dump"):
+        return model_or_dict.model_dump()
+    elif hasattr(model_or_dict, "dict"):
+        return model_or_dict.dict()
+    return model_or_dict
+
+
+# API Endpoints
 @app.post("/apps/register", response_model=AppRegistrationResponse)
 @leader_required
 async def register_app(app_spec: AppSpec):
     """Register a new application."""
     try:
-        # Convert AppSpec to dict for manager
-        spec_dict = app_spec.dict() if hasattr(app_spec, 'dict') else app_spec
+        spec_dict = _to_dict(app_spec)
         result = get_app_manager().register(spec_dict)
-        
+
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
-        
-        # Get app name from metadata
+
         app_name = spec_dict.get("metadata", {}).get("name")
         if not app_name:
             raise HTTPException(status_code=400, detail="App name is required in metadata")
-        
-        # Set up default scaling policy from the scaling section
+
+        # Set up default scaling policy
         scaling_config = spec_dict.get("scaling", {})
-        
         policy = ScalingPolicy(
             min_replicas=scaling_config.get("minReplicas", 1),
             max_replicas=scaling_config.get("maxReplicas", 5),
@@ -116,23 +133,26 @@ async def register_app(app_spec: AppSpec):
             scale_out_threshold_pct=scaling_config.get("scaleOutThresholdPct", 80),
             scale_in_threshold_pct=scaling_config.get("scaleInThresholdPct", 30),
             window_seconds=scaling_config.get("windowSeconds", 60),
-            cooldown_seconds=scaling_config.get("cooldownSeconds", 300)
+            cooldown_seconds=scaling_config.get("cooldownSeconds", 300),
         )
-        
+
         get_auto_scaler().set_policy(app_name, policy)
-        
+
         # Log event
         get_state_store().log_event(app_name, "registered", {"spec": spec_dict.get("spec", {})})
-        
+
         return AppRegistrationResponse(
             status="registered",
             app=app_name,
-            message="Application registered successfully"
+            message="Application registered successfully",
         )
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to register app: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/apps/{name}/up")
 @leader_required
@@ -140,18 +160,19 @@ async def start_app(name: str):
     """Start an application."""
     try:
         result = get_app_manager().start(name)
-        
+
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
-        
-        # Log event
+
         get_state_store().log_event(name, "started", result)
-        
         return result
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to start app {name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/apps/{name}/down")
 @leader_required
@@ -159,18 +180,19 @@ async def stop_app(name: str):
     """Stop an application."""
     try:
         result = get_app_manager().stop(name)
-        
+
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
-        
-        # Log event
+
         get_state_store().log_event(name, "stopped", result)
-        
         return result
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to stop app {name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.delete("/apps/{name}")
 @leader_required
@@ -178,40 +200,41 @@ async def delete_app(name: str):
     """Delete an application completely."""
     try:
         result = get_app_manager().delete(name)
-        
+
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
-        
-        # Log event
+
         get_state_store().log_event(name, "deleted", result)
-        
         return result
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to delete app {name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/apps/{name}/status", response_model=AppStatusResponse)
 async def app_status(name: str):
     """Get the status of an application."""
     try:
         result = get_app_manager().status(name)
-        
+
         if "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
-        
-        # Get app mode from database
+
         app_record = get_state_store().get_app(name)
         app_mode = app_record.mode if app_record else "auto"
-        
-        # Add mode to the result
+
         result["mode"] = app_mode
-        
         return AppStatusResponse(**result)
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get status for app {name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/apps/{name}/scale")
 @leader_required
@@ -219,28 +242,33 @@ async def scale_app(name: str, scale_request: ScaleRequest):
     """Manually scale an application."""
     try:
         result = get_app_manager().scale(name, scale_request.replicas)
-        
+
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
-        
-        # Log scaling action
+
         current_replicas = len(get_app_manager().instances.get(name, []))
         get_state_store().log_scaling_action(
-            name, current_replicas, scale_request.replicas,
-            "Manual scaling", ["manual"]
+            name,
+            current_replicas,
+            scale_request.replicas,
+            "Manual scaling",
+            ["manual"],
         )
-        
-        # Log event
-        get_state_store().log_event(name, "manual_scale", {
-            "old_replicas": current_replicas,
-            "new_replicas": scale_request.replicas
-        })
-        
+
+        get_state_store().log_event(
+            name,
+            "manual_scale",
+            {"old_replicas": current_replicas, "new_replicas": scale_request.replicas},
+        )
+
         return result
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to scale app {name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/apps/{name}/policy")
 @leader_required
@@ -248,7 +276,7 @@ async def set_scaling_policy(name: str, policy_request: PolicyRequest):
     """Update scaling policy for an application."""
     try:
         policy_data = policy_request.policy
-        
+
         policy = ScalingPolicy(
             min_replicas=policy_data.get("minReplicas", 1),
             max_replicas=policy_data.get("maxReplicas", 5),
@@ -257,145 +285,123 @@ async def set_scaling_policy(name: str, policy_request: PolicyRequest):
             scale_out_threshold_pct=policy_data.get("scaleOutThresholdPct", 80),
             scale_in_threshold_pct=policy_data.get("scaleInThresholdPct", 30),
             window_seconds=policy_data.get("windowSeconds", 20),
-            cooldown_seconds=policy_data.get("cooldownSeconds", 30)
+            cooldown_seconds=policy_data.get("cooldownSeconds", 30),
         )
-        
+
         get_auto_scaler().set_policy(name, policy)
-        
-        # Log event
         get_state_store().log_event(name, "policy_updated", policy_data)
-        
+
         return {"status": "updated", "app": name, "policy": policy_data}
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to update policy for app {name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/apps")
 async def list_apps():
     """List all registered applications."""
     try:
         apps = get_state_store().list_apps()
-        
-        # Add runtime status
-        for app in apps:
-            status_result = get_app_manager().status(app["name"])
-            app["status"] = status_result.get("status", "unknown")
-            app["replicas"] = status_result.get("replicas", 0)
-            app["ready_replicas"] = status_result.get("ready_replicas", 0)
-        
+
+        for app_item in apps:
+            status_result = get_app_manager().status(app_item["name"])
+            app_item["status"] = status_result.get("status", "unknown")
+            app_item["replicas"] = status_result.get("replicas", 0)
+            app_item["ready_replicas"] = status_result.get("ready_replicas", 0)
+
         return {"apps": apps}
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to list apps: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/apps/{name}/raw")
 async def get_app_raw_spec(name: str):
     """Get the raw and parsed spec for an application."""
     try:
-        # Get the parsed spec (normalized)
         parsed_spec = get_state_store().get_app(name)
         if not parsed_spec:
             raise HTTPException(status_code=404, detail=f"App {name} not found")
-            
-        # Get the raw spec (as submitted by user)
+
         raw_spec = get_state_store().get_raw_spec(name)
-        
-        return {
-            "name": name,
-            "raw": raw_spec,
-            "parsed": parsed_spec
-        }
+
+        return {"name": name, "raw": raw_spec, "parsed": parsed_spec}
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to get raw spec for app {name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/apps/{name}/logs")
 async def get_app_logs(name: str, lines: int = 100):
-    """Get logs for an application."""
+    """Get logs for an application across all running container instances."""
     try:
-        if name not in get_app_manager().instances:
-            raise HTTPException(status_code=404, detail="App not found or not running")
-        
         app_manager = get_app_manager()
+        if name not in app_manager.instances:
+            raise HTTPException(status_code=404, detail="App not found or not running")
+
         instances = app_manager.instances[name]
-        
         if not instances:
-            return {
-                "app": name,
-                "logs": []
-            }
-        
+            return {"app": name, "logs": []}
+
         all_logs = []
-        
-        # Collect logs from all container instances
         for instance in instances:
             try:
-                # Get the Docker container object
                 container = app_manager.client.containers.get(instance.container_id)
-                
-                # Get logs with timestamps
                 log_output = container.logs(
-                    tail=lines,
-                    timestamps=True,
-                    stdout=True,
-                    stderr=True
+                    tail=lines, timestamps=True, stdout=True, stderr=True
                 )
-                
-                # Decode and parse logs
-                log_lines = log_output.decode('utf-8', errors='replace').strip().split('\n')
-                
+                log_lines = log_output.decode("utf-8", errors="replace").strip().split("\n")
+
                 for log_line in log_lines:
                     if not log_line:
                         continue
-                    
-                    # Parse timestamp and message
-                    # Docker log format: "2023-01-01T12:00:00.000000000Z message"
-                    parts = log_line.split(' ', 1)
+
+                    parts = log_line.split(" ", 1)
                     if len(parts) == 2:
                         timestamp_str, message = parts
-                        # Parse ISO timestamp
                         try:
-                            from datetime import datetime
-                            timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00')).timestamp()
-                        except:
+                            timestamp = datetime.fromisoformat(
+                                timestamp_str.replace("Z", "+00:00")
+                            ).timestamp()
+                        except Exception:
                             timestamp = time.time()
                     else:
                         timestamp = time.time()
                         message = log_line
-                    
+
                     all_logs.append({
                         "timestamp": timestamp,
-                        "container": instance.container_id[:12],  # Short container ID
+                        "container": instance.container_id[:12],
                         "container_full": instance.container_id,
-                        "message": message
+                        "message": message,
                     })
-                    
+
             except docker.errors.NotFound:
                 logger.warning(f"Container {instance.container_id[:12]} not found for app {name}")
                 continue
             except Exception as e:
                 logger.error(f"Failed to get logs from container {instance.container_id[:12]}: {e}")
                 continue
-        
-        # Sort logs by timestamp (most recent first)
+
+        # Sort logs descending by timestamp
         all_logs.sort(key=lambda x: x["timestamp"], reverse=True)
-        
-        # Limit to requested number of lines
-        all_logs = all_logs[:lines]
-        
-        return {
-            "app": name,
-            "total_containers": len(instances),
-            "logs": all_logs
-        }
-        
+        return {"app": name, "total_containers": len(instances), "logs": all_logs[:lines]}
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get logs for app {name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/apps/{name}/metrics")
 async def get_app_metrics(name: str):
@@ -403,30 +409,34 @@ async def get_app_metrics(name: str):
     try:
         metrics_summary = get_auto_scaler().get_metrics_summary(name)
         scaling_history = get_state_store().get_scaling_history(name, limit=10)
-        
+
         return {
             "app": name,
             "metrics": metrics_summary,
-            "scaling_history": scaling_history
+            "scaling_history": scaling_history,
         }
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get metrics for app {name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/apps/{name}/simulateMetrics")
 @leader_required
 async def simulate_metrics(name: str, sim: SimulatedMetricsRequest):
-    """Inject simulated metrics for an app and optionally trigger immediate autoscale evaluation.
-    Helpful for verifying autoscaling without generating real load."""
+    """Inject simulated metrics for an app and optionally trigger autoscaling evaluation."""
     try:
-        if name not in get_app_manager().instances:
+        app_mgr = get_app_manager()
+        if name not in app_mgr.instances:
             raise HTTPException(status_code=404, detail="App not running")
 
-        instances = get_app_manager().instances[name]
+        instances = app_mgr.instances[name]
         replica_count = len(instances)
-        healthy = sum(1 for i in instances if i.state == 'ready')
+        healthy = sum(1 for i in instances if i.state == "ready")
         healthy_replicas = sim.healthyReplicas if sim.healthyReplicas is not None else healthy
+
         metrics = ScalingMetrics(
             rps=sim.rps,
             p95_latency_ms=sim.p95LatencyMs,
@@ -434,21 +444,20 @@ async def simulate_metrics(name: str, sim: SimulatedMetricsRequest):
             cpu_percent=sim.cpuPercent,
             memory_percent=sim.memoryPercent,
             healthy_replicas=healthy_replicas,
-            total_replicas=replica_count
+            total_replicas=replica_count,
         )
         get_auto_scaler().add_metrics(name, metrics)
 
         evaluation = None
         action = None
         if sim.evaluate:
-            # Get app mode from database
             app_record = get_state_store().get_app(name)
             app_mode = app_record.mode if app_record else "auto"
-            
+
             evaluation = get_auto_scaler().evaluate_scaling(name, replica_count, mode=app_mode)
             if evaluation.should_scale:
-                result = get_app_manager().scale(name, evaluation.target_replicas)
-                if result.get('status') == 'scaled':
+                result = app_mgr.scale(name, evaluation.target_replicas)
+                if result.get("status") == "scaled":
                     get_auto_scaler().record_scaling_action(name, evaluation.target_replicas)
                     get_state_store().log_scaling_action(
                         name,
@@ -456,13 +465,13 @@ async def simulate_metrics(name: str, sim: SimulatedMetricsRequest):
                         evaluation.target_replicas,
                         evaluation.reason,
                         evaluation.triggered_by,
-                        evaluation.metrics.__dict__ if evaluation.metrics else None
+                        evaluation.metrics.__dict__ if evaluation.metrics else None,
                     )
                     action = {
                         "scaled": True,
                         "from": evaluation.current_replicas,
                         "to": evaluation.target_replicas,
-                        "reason": evaluation.reason
+                        "reason": evaluation.reason,
                     }
                 else:
                     action = {"scaled": False, "error": result}
@@ -474,61 +483,64 @@ async def simulate_metrics(name: str, sim: SimulatedMetricsRequest):
                 "should_scale": evaluation.should_scale if evaluation else None,
                 "target_replicas": evaluation.target_replicas if evaluation else None,
                 "reason": evaluation.reason if evaluation else None,
-                "scale_factors": get_auto_scaler().last_scale_factors.get(name)
+                "scale_factors": get_auto_scaler().last_scale_factors.get(name),
             } if evaluation else None,
-            "action": action
+            "action": action,
         }
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to simulate metrics for {name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/metrics")
 async def get_system_metrics():
     """Get system-wide metrics for monitoring."""
     try:
-        # Collect metrics from all components
         all_apps = get_state_store().list_apps()
         total_apps = len(all_apps)
         running_apps = 0
         total_instances = 0
         healthy_instances = 0
-        
+
+        app_mgr = get_app_manager()
         for app in all_apps:
             app_name = app["name"]
-            if app_name in get_app_manager().instances:
-                instances = get_app_manager().instances[app_name]
+            if app_name in app_mgr.instances:
+                instances = app_mgr.instances[app_name]
                 if instances:
                     running_apps += 1
                     total_instances += len(instances)
                     healthy_instances += sum(1 for inst in instances if inst.state == "ready")
-        
-        # Get nginx status
+
         nginx_status = get_nginx_manager().get_nginx_status()
-        
-        # Get health check summary
         health_summary = get_health_checker().get_health_summary()
-        
+        cluster_ctrl = get_cluster_controller()
+
         return {
             "timestamp": time.time(),
-            "cluster": get_cluster_controller().get_cluster_status() if get_cluster_controller() else None,
+            "cluster": cluster_ctrl.get_cluster_status() if cluster_ctrl else None,
             "apps": {
                 "total": total_apps,
-                "running": running_apps
+                "running": running_apps,
             },
             "instances": {
                 "total": total_instances,
                 "healthy": healthy_instances,
-                "unhealthy": total_instances - healthy_instances
+                "unhealthy": total_instances - healthy_instances,
             },
             "nginx": nginx_status,
-            "health_checks": health_summary
+            "health_checks": health_summary,
         }
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get system metrics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/events")
 async def get_events(app: Optional[str] = None, limit: int = 100):
@@ -536,86 +548,25 @@ async def get_events(app: Optional[str] = None, limit: int = 100):
     try:
         events = get_state_store().get_events(app, limit)
         return {"events": events}
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get events: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/cluster/status")
 async def get_cluster_status():
     """Get detailed cluster status and membership."""
-    if not get_cluster_controller():
+    cluster_ctrl = get_cluster_controller()
+    if not cluster_ctrl:
         raise HTTPException(status_code=503, detail="Clustering not enabled")
-        
+
     try:
-        return get_cluster_controller().get_cluster_status()
+        return cluster_ctrl.get_cluster_status()
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get cluster status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/cluster/leader")
-async def get_cluster_leader():
-    """Get current cluster leader information."""
-    if not get_cluster_controller():
-        raise HTTPException(status_code=503, detail="Clustering not enabled")
-        
-    try:
-        leader_info = get_cluster_controller().get_leader_info()
-        if leader_info:
-            return leader_info
-        else:
-            raise HTTPException(status_code=503, detail="No leader elected")
-    except Exception as e:
-        logger.error(f"Failed to get cluster leader: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/cluster/health")
-async def cluster_health_check():
-    """Cluster-aware health check that includes leadership status."""
-    if not get_cluster_controller():
-        return {
-            "status": "healthy",
-            "clustering": "disabled",
-            "timestamp": time.time(),
-            "version": "1.0.0"
-        }
-        
-    try:
-        cluster_status = get_cluster_controller().get_cluster_status()
-        is_ready = get_cluster_controller().is_cluster_ready()
-        
-        return {
-            "status": "healthy" if is_ready else "degraded",
-            "clustering": "enabled",
-            "node_id": cluster_status["node_id"],
-            "state": cluster_status["state"],
-            "is_leader": cluster_status["is_leader"],
-            "leader_id": cluster_status["leader_id"],
-            "cluster_size": cluster_status["cluster_size"],
-            "cluster_ready": is_ready,
-            "timestamp": time.time(),
-            "version": "1.0.0"
-        }
-    except Exception as e:
-        logger.error(f"Failed cluster health check: {e}")
-        return {
-            "status": "unhealthy",
-            "clustering": "error",
-            "error": str(e),
-            "timestamp": time.time(),
-            "version": "1.0.0"
-        }
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "timestamp": time.time(),
-        "version": "1.0.0"
-    }
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-
