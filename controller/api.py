@@ -570,3 +570,10 @@ async def get_cluster_status():
     except Exception as e:
         logger.error(f"Failed to get cluster status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+@app.get("/cluster/health")
+async def cluster_health():
+    return {"status": "healthy", "cluster": "ok"}
